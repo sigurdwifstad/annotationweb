@@ -187,6 +187,9 @@ function setupSegmentation() {
         redrawSequence();
     });
 
+    // Setup AI button
+    $('#aiButton').click(inference);
+
     // Set first label active
     changeLabel(g_labelButtons[0].id)
 
@@ -465,6 +468,70 @@ function drawSpline(pointList, step_size, tension){
         prev_y = y;
     }
 }
+
+function sendAndReceiveDataForInference() {
+    // The purpose of this function will be:
+    // 1. to iterate through all frames
+    // 2. send image data to python function
+    // 3. python function performs inference and sends back control points dict
+    // 4. set control points for each frame. If there were manually selected key frames these will be skipped.
+    //const imageData = g_sequence.map(image => image.toDataURL());
+    return $.ajax({
+        type: "POST",
+        url: "/spline-line-point/inference/",
+        data: {
+            control_points: JSON.stringify(g_controlPoints),
+            n_labels: g_labelButtons.length,
+            image_id: JSON.stringify(g_imageID)
+        },
+        dataType: "json" // Need this do get result back as JSON
+    });
+}
+
+
+
+
+function inference() {
+    var messageBox = document.getElementById("message");
+    messageBox.innerHTML = '<span class="info">Performing automatic segmentation. Please wait...</span>';
+    sendAndReceiveDataForInference().done(function(data) {
+        console.log("Segmentation done..");
+        console.log(data);
+        var messageBox = document.getElementById("message");
+        if(data.success == "true") {
+            messageBox.innerHTML = '<span class="success">Segmentations were generated</span>';
+            // TODO: add code for inserting control points and key frames
+            g_controlPoints = JSON.parse(data.control_points)
+            //addControlPointsForNewFrame(g_currentFrameNr) // TODO: why is ctrlpt added only if there exist controlpoints before?
+            //addKeyFrame(g_currentFrameNr,color="#ff7f0e")
+
+            //addControlPoint(100, 100, g_currentFrameNr, g_currentObject, g_currentLabel, true)
+            //redrawSequence()
+
+
+            if(g_returnURL != '') {
+                window.location = g_returnURL;
+            } else {
+                // Reset image quality form before refreshing
+                //$('#imageQualityForm')[0].reset();
+                //$('#comments').val('');
+                // Refresh page
+                location.reload();
+            }
+        } else {
+            messageBox.innerHTML = '<div class="error"><strong>Segmentation failed</strong><br> ' + data.message + '</div>';
+        }
+        console.log(data.message);
+    }).fail(function(data) {
+        console.log("Ajax failed");
+        var messageBox = document.getElementById("message");
+        messageBox.innerHTML = '<span class="error">Segmentation failed</span>';
+    }).always(function(data) {
+        console.log("Ajax complete");
+    });
+    console.log("Inference function executed");
+}
+
 
 
 function sendDataForSave() {

@@ -5,7 +5,16 @@ from annotationweb.models import Task, KeyFrameAnnotation
 import common.task
 import json
 from spline_segmentation.models import *
+from annotationweb.models import ImageSequence
 from django.db import transaction
+
+from mdi.importers import MetaImageImporter
+import numpy as np
+import tensorflow as tf
+from scipy.ndimage import center_of_mass
+from scipy.interpolate import splev, splprep
+from skimage.morphology import thin
+from mlmia.dataloader import Resize, ResizeSegmentation
 
 
 def segment_next_image(request, task_id):
@@ -37,7 +46,7 @@ def segment_image(request, task_id, image_id):
 
 def save_segmentation(request):
     error_messages = ''
-
+    image_id = json.loads(request.POST['image_id'])
     control_points = json.loads(request.POST['control_points'])
     target_frame_types = json.loads(request.POST['target_frame_types'])
     n_labels = int(request.POST['n_labels'])
@@ -87,3 +96,121 @@ def save_segmentation(request):
 
 def show_segmentation(request, task_id, image_id):
     pass
+
+def inference(request):
+    try:
+        # Use atomic transaction here so if something crashes the annotations are restored..
+        with transaction.atomic():
+            image_id = json.loads(request.POST["image_id"])
+            n_labels = int(request.POST["n_labels"])
+            control_points = json.loads(request.POST['control_points'])
+            sequence_path = ImageSequence.objects.get(id=image_id).format.strip('US-2D_#.mhd')
+
+            ## Load image sequence using MetaImageImporter
+            #importer = MetaImageImporter(filepath=sequence_path, frame_tag='US-2D_*')
+            #data = (importer.data[:][..., None] / 255.0).astype(np.float32).transpose(0, 2, 1, 3)
+            ## Reshape to 256x256
+            #data_resize = np.zeros((data.shape[0], 256, 256, 1))
+            #resizer = Resize(256, 256)
+            #for i in range(data.shape[0]):
+            #    data_resize[i] = resizer.transform(data[i])
+#
+            ## Load saved_model object
+            #model_path = "C:/Users/sigurdvw/Models/ethiopia_pseudo_unet"
+            #model = tf.keras.models.load_model(model_path, compile=False)
+            ## Assert that number of labels matches model outputs
+            #assert model.output_shape[-1] == n_labels + 1  # Plus one due to background
+            ## Predict (and threshold at 0.0)
+            #pred = model.predict(data_resize)[..., 1:] > 0.0
+            ## Reshape back to original shape
+            #resizer_seg = ResizeSegmentation(data.shape[1], data.shape[2])
+            #pred_resize = np.zeros((*data.shape[:-1], pred.shape[-1]))
+            #for i in range(pred.shape[0]):
+            #    for j in range(pred.shape[-1]):
+            #        pred_resize[i, ..., j] = resizer_seg.transform(pred[i, ..., j])
+            ## Create controlpoint object
+            ## TODO: get labels from segmentation.js
+            #labels = [{'id': 6, 'red': 0, 'green': 0, 'blue': 255, 'parent_id': 0},
+            #          {'id': 5, 'red': 255, 'green': 0, 'blue': 0, 'parent_id': 0},
+            #          {'id': 7, 'red': 0, 'green': 255, 'blue': 0, 'parent_id': 0},
+            #          {'id': 8, 'red': 253, 'green': 208, 'blue': 23, 'parent_id': 0}]
+            #pts_tables = estimate_valve_spline(pred)
+            #for frame in range(data.shape[0]):
+            #    if str(frame) in control_points.keys():
+            #        continue
+            #    instance = {'1': dict(), '2': dict(), '3': dict(), '4': dict()}
+#
+            #    for j in range(pred.shape[-1]):
+            #        pts = pts_tables[j][frame]
+            #        # Skip invalid control points
+            #        if np.isnan(np.array(pts)).any():
+            #            continue
+            #        instance[str(j + 1)]['label'] = labels[j]
+            #        instance[str(j + 1)]['control_points'] = []
+            #        for pt in pts:
+            #            instance[str(j + 1)]['control_points'].append(
+            #                {'x': pt[0], 'y': pt[1], 'label_id': labels[j]['id'], 'label': j, 'uncertain': 'true'})
+#
+            #        # set controlpoints
+            #        control_points[str(frame)] = instance
+
+
+            response = {
+                'success': 'true',
+                'message': 'Control points inferred',
+                'control_points': json.dumps(dict(sorted(control_points.items(), key=lambda x: int(x[0]))))
+            }
+    except Exception as e:
+        response = {
+            'success': 'false',
+            'message': str(e),
+            'control_points': 'none'
+        }
+        raise e
+
+    return JsonResponse(response)
+
+def estimate_valve_spline(pred):
+
+    npts = 12
+    N_classes = pred.shape[-1]
+    N = pred.shape[0]
+
+    annulus_left = np.zeros((pred.shape[0], 1, 2))
+    annulus_right = np.zeros((pred.shape[0], 1, 2))
+    leaflet_left = np.zeros((pred.shape[0], npts, 2))
+    leaflet_right = np.zeros((pred.shape[0], npts, 2))
+
+    if N_classes == 5:
+        pred = pred[...,1:]  # Remove background
+        N_classes -= 1
+    elif N_classes != 4:
+        raise AssertionError('Unsupported number of classes')
+
+    for i in range(N):
+        annulus_left[i, 0, :] = np.array(center_of_mass(pred[i, ..., 2])[::-1])
+        annulus_right[i, 0, :] = np.array(center_of_mass(pred[i, ..., 3])[::-1])
+        leaflet_left[i, :, :] = mask2centercurve(pred[i, ..., 0], npts)
+        leaflet_right[i, :, :] = mask2centercurve(pred[i, ..., 1], npts)
+
+    return leaflet_left, leaflet_right, annulus_left, annulus_right
+
+def mask2centercurve(mask_out, npts):
+    if not mask_out.any():
+        return [np.nan, np.nan]
+
+    # Thinning
+    curve = thin(mask_out)
+    # Get coordinates
+    x,y = np.meshgrid(np.arange(mask_out.shape[0]),np.arange(mask_out.shape[1]))
+    pts = np.array([x[curve],y[curve]]).T
+    if pts.shape[0] < npts:
+        return [np.nan, np.nan]
+    # Fit spline
+    tck, u = splprep([pts[:,0], pts[:,1]], u=None, k=3, s=100)
+    # resample along spline
+    u_new = np.linspace(u.min(), u.max(), npts)
+    x_new, y_new = splev(u_new, tck, der=0)
+    c_smooth = np.concatenate((x_new[:, np.newaxis], y_new[:, np.newaxis]), axis=1)
+
+    return c_smooth
