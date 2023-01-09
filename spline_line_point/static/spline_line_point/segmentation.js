@@ -222,7 +222,7 @@ function getClosestPoint(x, y) {
     var minObject = -1;
 
     for(var j in g_controlPoints[g_currentFrameNr]) {
-        for(var i = 0; i < g_controlPoints[g_currentFrameNr][j].control_points.length+1; i++) {
+        for(var i = 0; i < g_controlPoints[g_currentFrameNr][j].control_points.length; i++) {
             var point = getControlPoint(i, j);
             var distance = Math.sqrt((point.x - x) * (point.x - x) + (point.y - y) * (point.y - y));
             if(distance < minDistance) {
