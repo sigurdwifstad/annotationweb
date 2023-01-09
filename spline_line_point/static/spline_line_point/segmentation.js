@@ -222,7 +222,7 @@ function getClosestPoint(x, y) {
     var minObject = -1;
 
     for(var j in g_controlPoints[g_currentFrameNr]) {
-        for(var i = 0; i < g_controlPoints[g_currentFrameNr][j].control_points.length; i++) {
+        for(var i = 0; i < g_controlPoints[g_currentFrameNr][j].control_points.length+1; i++) {
             var point = getControlPoint(i, j);
             var distance = Math.sqrt((point.x - x) * (point.x - x) + (point.y - y) * (point.y - y));
             if(distance < minDistance) {
@@ -470,12 +470,6 @@ function drawSpline(pointList, step_size, tension){
 }
 
 function sendAndReceiveDataForInference() {
-    // The purpose of this function will be:
-    // 1. to iterate through all frames
-    // 2. send image data to python function
-    // 3. python function performs inference and sends back control points dict
-    // 4. set control points for each frame. If there were manually selected key frames these will be skipped.
-    //const imageData = g_sequence.map(image => image.toDataURL());
     return $.ajax({
         type: "POST",
         url: "/spline-line-point/inference/",
@@ -494,30 +488,31 @@ function sendAndReceiveDataForInference() {
 function inference() {
     var messageBox = document.getElementById("message");
     messageBox.innerHTML = '<span class="info">Performing automatic segmentation. Please wait...</span>';
+    setPlayButton(false)
     sendAndReceiveDataForInference().done(function(data) {
         console.log("Segmentation done..");
         console.log(data);
         var messageBox = document.getElementById("message");
         if(data.success == "true") {
             messageBox.innerHTML = '<span class="success">Segmentations were generated</span>';
-            // TODO: add code for inserting control points and key frames
-            g_controlPoints = JSON.parse(data.control_points)
-            //addControlPointsForNewFrame(g_currentFrameNr) // TODO: why is ctrlpt added only if there exist controlpoints before?
-            //addKeyFrame(g_currentFrameNr,color="#ff7f0e")
-
-            //addControlPoint(100, 100, g_currentFrameNr, g_currentObject, g_currentLabel, true)
-            //redrawSequence()
-
-
-            if(g_returnURL != '') {
-                window.location = g_returnURL;
-            } else {
-                // Reset image quality form before refreshing
-                //$('#imageQualityForm')[0].reset();
-                //$('#comments').val('');
-                // Refresh page
-                location.reload();
+            setPlayButton(true)
+            /*
+            for (let frame = 0; frame < g_sequenceLength; frame+=1) {
+                if(g_targetFrames.includes(frame)) // Already exists
+                    continue;
+                addKeyFrame(frame,color="#bcbd22")
+                g_targetFrameTypes[frame] = 'AI';
             }
+             */
+            g_controlPoints = JSON.parse(data.control_points)
+            // TODO (Maybe): Refactor views to send a simple dict, then use addControlPoint() to set the points
+            //addControlPoint(100, 100, g_currentFrameNr, g_currentObject, g_currentLabel, true)
+            //addKeyFrame(g_currentFrameNr,color="#ff7f0e")
+            //addControlPointsForNewFrame(g_currentFrameNr) // TODO: why is ctrlpt added only if there exist controlpoints before?
+            //addControlPoint(100, 100, g_currentFrameNr, g_currentObject, g_currentLabel, true)
+            redrawSequence()
+
+
         } else {
             messageBox.innerHTML = '<div class="error"><strong>Segmentation failed</strong><br> ' + data.message + '</div>';
         }
