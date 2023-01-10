@@ -102,6 +102,7 @@ def inference(request):
         with transaction.atomic():
             image_id = json.loads(request.POST["image_id"])
             n_labels = int(request.POST["n_labels"])
+            labels = json.loads(request.POST["labels"])
             control_points = json.loads(request.POST['control_points'])
             sequence_path = ImageSequence.objects.get(id=image_id).format.strip('US-2D_#.mhd')
 
@@ -128,11 +129,6 @@ def inference(request):
                 for j in range(pred.shape[-1]):
                     pred_resize[i, ..., j] = resizer_seg.transform(pred[i, ..., j])
             # Create controlpoint object
-            # TODO: get labels from segmentation.js
-            labels = [{'id': 5, 'red': 255, 'green': 0, 'blue': 0, 'parent_id': 0},
-                      {'id': 6, 'red': 0, 'green': 0, 'blue': 255, 'parent_id': 0},
-                      {'id': 7, 'red': 0, 'green': 255, 'blue': 0, 'parent_id': 0},
-                      {'id': 8, 'red': 253, 'green': 208, 'blue': 23, 'parent_id': 0}]
             pts_tables = estimate_valve_spline(pred_resize)
             for frame in range(data.shape[0]):
                 if str(frame) in control_points.keys():

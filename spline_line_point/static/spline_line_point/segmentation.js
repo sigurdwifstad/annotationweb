@@ -476,6 +476,7 @@ function sendAndReceiveDataForInference() {
         data: {
             control_points: JSON.stringify(g_controlPoints),
             n_labels: g_labelButtons.length,
+            labels: JSON.stringify(g_labelButtons),
             image_id: JSON.stringify(g_imageID)
         },
         dataType: "json" // Need this do get result back as JSON
