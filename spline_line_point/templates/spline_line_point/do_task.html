@@ -107,6 +107,15 @@ setReturnURL('{{ return_url|safe }}');
 </form>
 </div>
 
+<div id="view">
+<form id="viewForm">
+    Standard View:
+    {% for view_id, view_name in view_choices %}
+    <input type="radio" name="view" value="{{ view_id }}" required{% if chosen_view == view_id %} checked="checked"{% endif %}> {{ view_name }}
+    {% endfor %}
+</form>
+</div>
+
 <div id="labelButtons">
 {% block label_buttons %}
 <div class="flexButtons">

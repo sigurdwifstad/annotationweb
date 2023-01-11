@@ -18,6 +18,7 @@ class SearchFilter:
             labels_selected = [label['id'] for label in self.labels]
 
         self.image_quality = [x for x, y in ImageAnnotation.IMAGE_QUALITY_CHOICES]
+        self.view = [x for x, y in ImageAnnotation.VIEW_CHOICES]
         self.subjects = Subject.objects.filter(dataset__task=task)
         self.users = User.objects.filter(imageannotation__task=task).distinct()
 
@@ -31,6 +32,7 @@ class SearchFilter:
             sort_by = ImageListForm.SORT_DATE_DESC # Default sort
             self.set_value('sort_by', sort_by)
             self.set_value('image_quality', self.image_quality)
+            self.set_value('view', self.view)
             subjects_selected = [subject.id for subject in self.subjects]
             self.set_value('subject', subjects_selected)
             self.set_value('label', labels_selected)

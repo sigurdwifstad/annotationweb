@@ -483,6 +483,7 @@ function sendDataForSave() {
             rejected: g_rejected ? 'true':'false',
             comments: $('#comments').val(),
             quality: $('input[name=quality]:checked').val(),
+            view: $('input[name=view]:checked').val(),
         },
         dataType: "json" // Need this do get result back as JSON
     });

@@ -68,6 +68,13 @@ class ImageListForm(forms.Form):
         widget=forms.SelectMultiple(attrs={'onchange': 'this.form.submit();'})
     )
 
+    view = forms.MultipleChoiceField(
+        label='View',
+        choices=ImageAnnotation.VIEW_CHOICES,
+        initial=[x for x, y in ImageAnnotation.VIEW_CHOICES],
+        widget=forms.SelectMultiple(attrs={'onchange': 'this.form.submit();'})
+    )
+
     def __init__(self, subjects, users, metadata, data=None, labels=None, initial=None):
         super().__init__(data, initial=initial)
 

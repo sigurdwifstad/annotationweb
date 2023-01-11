@@ -506,6 +506,7 @@ def task(request, task_id):
     subjects_selected = search_filters.get_value('subject')
     users_selected = search_filters.get_value('user')
     image_quality = search_filters.get_value('image_quality')
+    view = search_filters.get_value('view')
     metadata = search_filters.get_value('metadata')
 
     if len(metadata) > 0:
@@ -547,6 +548,15 @@ def task(request, task_id):
                 imageannotation__user__in=users_selected,
                 imageannotation__keyframeannotation__imagelabel__in=labels_selected,
                 subject__in=subjects_selected,
+            )
+        elif task.type == Task.SPLINE_LINE_POINT:
+            queryset = queryset.filter(
+                imageannotation__image_quality__in=image_quality,
+                imageannotation__view__in=view,
+                imageannotation__task=task,
+                imageannotation__finished=True,
+                imageannotation__user__in=users_selected,
+                subject__in=subjects_selected
             )
         else:
             queryset = queryset.filter(

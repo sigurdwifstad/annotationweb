@@ -132,6 +132,19 @@ class ImageAnnotation(models.Model):
         (QUALITY_GOOD, 'Good'),
     )
     image_quality = models.CharField(max_length=50, choices=IMAGE_QUALITY_CHOICES)
+
+    VIEW_A4C = 'a4c'
+    VIEW_A2C = 'a2c'
+    VIEW_PLAX = 'plax'
+    VIEW_ALAX = 'alax'
+    VIEW_CHOICES = (
+        (VIEW_A4C, 'A4C'),
+        (VIEW_A2C, 'A2C'),
+        (VIEW_PLAX, 'PLAX'),
+        (VIEW_ALAX, 'ALAX'),
+    )
+    view = models.CharField(max_length=50, choices=VIEW_CHOICES)
+
     comments = models.TextField()
     rejected = models.BooleanField()
     finished = models.BooleanField(default=True)
