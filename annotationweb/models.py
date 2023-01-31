@@ -73,6 +73,7 @@ class Task(models.Model):
                      ' type="button">Add new label</button>')
     user = models.ManyToManyField(User)
     description = models.TextField(default='', blank=True)
+    network_config_path = models.CharField(default='', help_text='Path to config file defining neural network parameters', max_length=1000, blank=True)
     large_image_layout = models.BooleanField(default=False, help_text='Use a large image layout for annotation')
     post_processing_method = models.CharField(default='', help_text='Name of post processing method to use', max_length=255, blank=True)
 

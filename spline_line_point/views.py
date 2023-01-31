@@ -1,3 +1,5 @@
+import os
+
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponseRedirect
@@ -14,6 +16,7 @@ import cv2
 from scipy.ndimage import center_of_mass
 from scipy.interpolate import splev, splprep
 from mlmia.dataloader import Resize, ResizeSegmentation
+
 
 
 def segment_next_image(request, task_id):
@@ -100,7 +103,9 @@ def inference(request):
     try:
         # Use atomic transaction here so if something crashes the annotations are restored..
         with transaction.atomic():
-            image_id = json.loads(request.POST["image_id"])
+            print(tf.config.list_physical_devices())
+            image_id = int(request.POST["image_id"])
+            task_id = int(request.POST["task_id"])
             n_labels = int(request.POST["n_labels"])
             labels = json.loads(request.POST["labels"])
             control_points = json.loads(request.POST['control_points'])
@@ -116,12 +121,16 @@ def inference(request):
                 data_resize[i] = resizer.transform(data[i])
 
             # Load saved_model object
-            model_path = "C:/Users/sigurdvw/Models/ethiopia_pseudo_unet"
-            model = tf.keras.models.load_model(model_path, compile=False)
+            with open(Task.objects.get(id=task_id).network_config_path) as f:
+                config = json.load(f)['config']
+            model = tf.keras.models.load_model(config['model_path'], compile=False)
             # Assert that number of labels matches model outputs
-            assert model.output_shape[-1] == n_labels + 1  # Plus one due to background
-            # Predict (and threshold at 0.0)
-            pred = model.predict(data_resize)[..., 1:] > 0.0
+            assert len(config['n_control_points']) == len(config['output_channels'])
+            assert len(config['output_channels']) == n_labels
+            assert (np.array(config['output_channels']) > 0).all()
+            assert (np.array(config['n_control_points']) > 0).all()
+            # Predict, choose output channels slice, threshold
+            pred = model.predict(data_resize)[..., np.array(config['output_channels'])] > float(config['threshold'])
             # Reshape back to original shape
             resizer_seg = ResizeSegmentation(data.shape[1], data.shape[2])
             pred_resize = np.zeros((*data.shape[:-1], pred.shape[-1]))
@@ -129,11 +138,13 @@ def inference(request):
                 for j in range(pred.shape[-1]):
                     pred_resize[i, ..., j] = resizer_seg.transform(pred[i, ..., j])
             # Create controlpoint object
-            pts_tables = estimate_valve_spline(pred_resize)
+            pts_tables = estimate_spline(pred_resize, config['n_control_points'])
             for frame in range(data.shape[0]):
                 if str(frame) in control_points.keys():
                     continue
-                instance = {'1': dict(), '2': dict(), '3': dict(), '4': dict()}
+                instance = {}
+                for i in range(n_labels):
+                    instance[str(i+1)] = dict()
 
                 for j in range(pred.shape[-1]):
                     pts = pts_tables[j][frame]
@@ -151,7 +162,6 @@ def inference(request):
                     if instance:
                         control_points[str(frame)] = instance
 
-
             response = {
                 'success': 'true',
                 'message': 'Control points inferred',
@@ -167,32 +177,28 @@ def inference(request):
 
     return JsonResponse(response)
 
-def estimate_valve_spline(pred):
+def estimate_spline(pred, n_control_points):
 
-    npts = 7
-    N_classes = pred.shape[-1]
-    N = pred.shape[0]
+    assert len(n_control_points) == pred.shape[-1]
+    nframes = pred.shape[0]
 
-    annulus_left = np.zeros((pred.shape[0], 1, 2))
-    annulus_right = np.zeros((pred.shape[0], 1, 2))
-    leaflet_left = np.zeros((pred.shape[0], npts, 2))
-    leaflet_right = np.zeros((pred.shape[0], npts, 2))
+    pts_table_list = []
 
-    if N_classes == 5:
-        pred = pred[...,1:]  # Remove background
-        N_classes -= 1
-    elif N_classes != 4:
-        raise AssertionError('Unsupported number of classes')
+    for channel, npts in enumerate(n_control_points):
+        pts_table = np.zeros((nframes, npts, 2))
 
-    for i in range(N):
-        annulus_left[i, 0, :] = np.array(center_of_mass(pred[i, ..., 2])[::-1])
-        annulus_right[i, 0, :] = np.array(center_of_mass(pred[i, ..., 3])[::-1])
-        leaflet_left[i, :, :] = mask2controlpoints(pred[i, ..., 0], npts)
-        leaflet_right[i, :, :] = mask2controlpoints(pred[i, ..., 1], npts)
+        for i in range(nframes):
+            if npts == 1:
+                pts_table[i, 0, :] = np.array(center_of_mass(pred[i, ..., channel])[::-1])
+            else:
+                pts_table[i, :, :] = mask2controlpoints(pred[i, ..., channel], npts)
+        pts_table_list.append(pts_table)
 
-    return leaflet_left, leaflet_right, annulus_left, annulus_right
+    return pts_table_list
 
 def mask2controlpoints(mask_out, npts):
+    # TODO: fix issue where first and last points overlap
+
     if not mask_out.any():
         return [np.nan, np.nan]
 
@@ -217,8 +223,8 @@ def mask2controlpoints(mask_out, npts):
     # Spline rep.
     tck, u = splprep([x, y], u=None, k=3, s=0)
     # resample along spline
-    u_new = np.linspace(u.min(), u.max(), npts)
+    u_new = np.linspace(u.min(), u.max(), npts+1)
     x_new, y_new = splev(u_new, tck, der=0)
     c_smooth = np.concatenate((x_new[:, np.newaxis], y_new[:, np.newaxis]), axis=1)
-
+    c_smooth = c_smooth[:-1]
     return c_smooth

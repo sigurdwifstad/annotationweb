@@ -121,7 +121,7 @@ class SplineLinePointExporter(Exporter):
                         b = control_points[i]
                         c = control_points[(i+1) % max_index]
                         d = control_points[(i+2) % max_index]
-                        length = sqrt((b.x - c.x)*(b.x - c.x) + (b.y - c.y)*(b.y - c.y))
+                        length = max(0.01, sqrt((b.x - c.x)*(b.x - c.x) + (b.y - c.y)*(b.y - c.y)))
                         # Not a very elegant solution ... could try to estimate the spline length instead
                         # or draw straight lines between consecutive points instead
                         step_size = min(0.01, 1.0 / (length*2))
