@@ -15,8 +15,6 @@ import tensorflow as tf
 import cv2
 from scipy.ndimage import center_of_mass
 from scipy.interpolate import splev, splprep
-from mlmia.dataloader import Resize, ResizeSegmentation
-
 
 
 def segment_next_image(request, task_id):
@@ -116,9 +114,8 @@ def inference(request):
             data = (importer.data[:][..., None] / 255.0).astype(np.float32).transpose(0, 2, 1, 3)
             # Reshape to 256x256
             data_resize = np.zeros((data.shape[0], 256, 256, 1))
-            resizer = Resize(256, 256)
             for i in range(data.shape[0]):
-                data_resize[i] = resizer.transform(data[i])
+                data_resize[i, ..., 0] = cv2.resize(data[i], dsize=(256, 256))
 
             # Load saved_model object
             with open(Task.objects.get(id=task_id).network_config_path) as f:
@@ -132,13 +129,12 @@ def inference(request):
             # Predict, choose output channels slice, threshold
             pred = model.predict(data_resize)[..., np.array(config['output_channels'])] > float(config['threshold'])
             # Reshape back to original shape
-            resizer_seg = ResizeSegmentation(data.shape[1], data.shape[2])
             pred_resize = np.zeros((*data.shape[:-1], pred.shape[-1]))
             for i in range(pred.shape[0]):
                 for j in range(pred.shape[-1]):
-                    pred_resize[i, ..., j] = resizer_seg.transform(pred[i, ..., j])
+                    pred_resize[i, ..., j] = cv2.resize(pred[i, ..., j].astype('uint8')*255, dsize=data[0,...,0].shape[::-1])
             # Create controlpoint object
-            pts_tables = estimate_spline(pred_resize, config['n_control_points'])
+            pts_tables = estimate_spline(pred_resize.astype('float32')/255, config['n_control_points'])
             for frame in range(data.shape[0]):
                 if str(frame) in control_points.keys():
                     continue
