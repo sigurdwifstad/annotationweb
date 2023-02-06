@@ -46,6 +46,7 @@ class Task(models.Model):
     CARDIAC_ALAX_SEGMENTATION = 'cardiac_alax_segmentation'
     SPLINE_SEGMENTATION = 'spline_segmentation'
     SPLINE_LINE_POINT = 'spline_line_point'
+    AUTO_SEGMENTATION = 'auto_segmentation'
     TASK_TYPES = (
         (CLASSIFICATION, 'Classification'),
         (BOUNDING_BOX, 'Bounding box'),
@@ -54,7 +55,8 @@ class Task(models.Model):
         (CARDIAC_PLAX_SEGMENTATION, 'Cardiac PLAX segmentation'),
         (CARDIAC_ALAX_SEGMENTATION, 'Cardiac ALAX segmentation'),
         (SPLINE_SEGMENTATION, 'Spline segmentation'),
-        (SPLINE_LINE_POINT, 'Splines, lines & point segmentation')
+        (SPLINE_LINE_POINT, 'Splines, lines & point segmentation'),
+        (AUTO_SEGMENTATION, 'Auto segmentation')
     )
 
     name = models.CharField(max_length=200)
@@ -73,7 +75,7 @@ class Task(models.Model):
                      ' type="button">Add new label</button>')
     user = models.ManyToManyField(User)
     description = models.TextField(default='', blank=True)
-    network_config_path = models.CharField(default='', help_text='Path to config file defining neural network parameters', max_length=1000, blank=True)
+    network_config_path = models.CharField(default='', help_text='Path to config file defining neural network parameters (Auto segmentation task only)', max_length=1000, blank=True)
     large_image_layout = models.BooleanField(default=False, help_text='Use a large image layout for annotation')
     post_processing_method = models.CharField(default='', help_text='Name of post processing method to use', max_length=255, blank=True)
 
