@@ -472,7 +472,7 @@ function drawSpline(pointList, step_size, tension){
 function sendAndReceiveDataForInference() {
     return $.ajax({
         type: "POST",
-        url: "/spline-line-point/inference/",
+        url: "/auto-segmentation/inference/",
         data: {
             control_points: JSON.stringify(g_controlPoints),
             n_labels: g_labelButtons.length,
@@ -527,7 +527,7 @@ function inference() {
 function sendDataForSave() {
     return $.ajax({
         type: "POST",
-        url: "/spline-line-point/save/",
+        url: "/auto-segmentation/save/",
         data: {
             control_points: JSON.stringify(g_controlPoints),
             target_frames: JSON.stringify(g_targetFrames),

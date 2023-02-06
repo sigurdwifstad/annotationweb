@@ -42,7 +42,7 @@ urlpatterns = [
     path('cardiac-alax/', include('cardiac_apical_long_axis.urls')),
     path('spline-segmentation/', include('spline_segmentation.urls')),
     path('spline-line-point/', include('spline_line_point.urls')),
-    path('auto_segmentation/', include('auto_segmentation.urls'))
+    path('auto-segmentation/', include('auto_segmentation.urls'))
 ]
 
 # This is for making statics in a development environment
