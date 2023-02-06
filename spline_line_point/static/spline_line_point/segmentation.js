@@ -187,9 +187,6 @@ function setupSegmentation() {
         redrawSequence();
     });
 
-    // Setup AI button
-    $('#aiButton').click(inference);
-
     // Set first label active
     changeLabel(g_labelButtons[0].id)
 
@@ -468,60 +465,6 @@ function drawSpline(pointList, step_size, tension){
         prev_y = y;
     }
 }
-
-function sendAndReceiveDataForInference() {
-    return $.ajax({
-        type: "POST",
-        url: "/spline-line-point/inference/",
-        data: {
-            control_points: JSON.stringify(g_controlPoints),
-            n_labels: g_labelButtons.length,
-            labels: JSON.stringify(g_labelButtons),
-            image_id: g_imageID,
-            task_id: g_taskID,
-        },
-        dataType: "json" // Need this do get result back as JSON
-    });
-}
-
-
-
-
-function inference() {
-    var messageBox = document.getElementById("message");
-    messageBox.innerHTML = '<span class="info">Performing automatic segmentation. Please wait...</span>';
-    sendAndReceiveDataForInference().done(function(data) {
-        console.log("Segmentation done..");
-        console.log(data);
-        var messageBox = document.getElementById("message");
-        if(data.success == "true") {
-            messageBox.innerHTML = '<span class="success">Segmentations were generated</span>';
-            /*
-            for (let frame = 0; frame < g_sequenceLength; frame+=1) {
-                if(g_targetFrames.includes(frame)) // Already exists
-                    continue;
-                addKeyFrame(frame,color="#bcbd22")
-                g_targetFrameTypes[frame] = 'AI';
-            }
-            */
-            g_controlPoints = JSON.parse(data.control_points)
-            redrawSequence()
-
-
-        } else {
-            messageBox.innerHTML = '<div class="error"><strong>Segmentation failed</strong><br> ' + data.message + '</div>';
-        }
-        console.log(data.message);
-    }).fail(function(data) {
-        console.log("Ajax failed");
-        var messageBox = document.getElementById("message");
-        messageBox.innerHTML = '<span class="error">Segmentation failed</span>';
-    }).always(function(data) {
-        console.log("Ajax complete");
-    });
-    console.log("Inference function executed");
-}
-
 
 
 function sendDataForSave() {
