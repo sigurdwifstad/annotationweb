@@ -8,6 +8,7 @@ var g_labelToMove = -1;
 var g_moveDistanceThreshold = 8;
 var g_drawLine = false;
 var g_currentLabel = -1;
+var g_targetFrameTypes = {};
 
 function getMaxObjectID() {
     var max = -1;
@@ -23,7 +24,7 @@ function setupSegmentation() {
 
     // Define event callbacks
     $('#canvas').mousedown(function(e) {
-        if(e.ctrlKey && g_controlPoints[g_currentFrameNr][g_currentObject].control_points.length >= 1) { // Create new object if ctrl key is held down TODO: verify that works
+        if(e.ctrlKey && g_controlPoints[g_currentFrameNr][g_currentObject].control_points.length >= 1) { // Create new object if ctrl key is held down
             g_currentObject = getMaxObjectID()+1;
             data = {label: g_labelButtons[g_currentLabel], control_points: []};
             g_controlPoints[g_currentFrameNr][g_currentObject] = data;
@@ -132,15 +133,58 @@ function setupSegmentation() {
         redrawSequence();
     });
 
-    $(document).keydown(function(event) {
+    /*
+    $(document).keydown(function(event) {  // Had to remove this to make saving work
        if(event.ctrlKey)  {
            g_drawLine = false;
            redrawSequence();
        }
     });
+    */
 
-    $('#addFrameButton').click(function() {
-        addControlPointsForNewFrame(g_currentFrameNr);
+    $("#addNormalFrameButton").click(function() {
+        setPlayButton(false);
+        if(g_targetFrames.includes(g_currentFrameNr)) // Already exists
+            return;
+        addKeyFrame(g_currentFrameNr, '#555555');
+        g_targetFrameTypes[g_currentFrameNr] = 'Normal';
+        g_currentTargetFrameIndex = g_targetFrames.length-1;
+    });
+
+
+    $("#addEDFrameButton").click(function() {
+        setPlayButton(false);
+        if(g_targetFrames.includes(g_currentFrameNr)) // Already exists
+            return;
+        addKeyFrame(g_currentFrameNr, '#CC3434');
+        g_targetFrameTypes[g_currentFrameNr] = 'ED';
+        g_currentTargetFrameIndex = g_targetFrames.length-1;
+    });
+
+
+    $("#addESFrameButton").click(function() {
+        setPlayButton(false);
+        if(g_targetFrames.includes(g_currentFrameNr)) // Already exists
+            return;
+        addKeyFrame(g_currentFrameNr, '#0077b3');
+        g_targetFrameTypes[g_currentFrameNr] = 'ES';
+        g_currentTargetFrameIndex = g_targetFrames.length-1;
+    });
+
+    $('#copyAnnotation').click(function() {
+        // Verify that we are on a target frame;
+        if(g_targetFrames.indexOf(g_currentFrameNr) < 0 || g_targetFrames.length === 1)
+            return;
+
+        // Find previous frame
+        var frame_index = g_targetFrames.findIndex(index => index === g_currentFrameNr);
+        var copy_index = frame_index - 1;
+        if(copy_index < 0)
+            return;
+
+        // Copy and potentially replace previous segmentation
+        g_controlPoints[g_currentFrameNr] = JSON.parse(JSON.stringify(g_controlPoints[g_targetFrames[copy_index]])); // Hack for doing deep copy
+        redrawSequence();
     });
 
     // Set first label active
@@ -241,6 +285,7 @@ function setControlPoint(index, object, x, y) {
 function isPointOnSpline(pointX, pointY) {
     for(var object in g_controlPoints[g_currentFrameNr]) {
         for (var i = 0; i < g_controlPoints[g_currentFrameNr][object].control_points.length; ++i) {
+
             var a = getControlPoint(max(0, i - 1), object);
             var b = getControlPoint(i, object);
             var c = getControlPoint(min(g_controlPoints[g_currentFrameNr][object].control_points.length - 1, i + 1), object);
@@ -293,13 +338,21 @@ function redraw(){
             if (i === 0) {
                 first = maxIndex - 1;
             } else {
-                first = i - 1;
+            first = i - 1;
             }
-
+            /*
+            // Implements 2D spline
             var a = getControlPoint(first, j);
             var b = getControlPoint(i, j);
             var c = getControlPoint((i + 1) % maxIndex, j);
             var d = getControlPoint((i + 2) % maxIndex, j);
+            */
+
+            // Implements 1D spline
+            var a = getControlPoint(max(0, i - 1), j);
+            var b = getControlPoint(i, j);
+            var c = getControlPoint(min(g_controlPoints[g_currentFrameNr][j].control_points.length - 1, i + 1), j);
+            var d = getControlPoint(min(g_controlPoints[g_currentFrameNr][j].control_points.length - 1, i + 2), j);
 
             var step = 0.1;
             var tension = 0.5;
@@ -315,7 +368,7 @@ function redraw(){
             drawSpline(pointList, step, tension)
 
             // Draw control point
-            if (g_controlPoints[g_currentFrameNr][j].control_points.length == 1) {
+            if (maxIndex == 1) {
                 g_context.fillStyle = g_context.strokeStyle;
                 g_context.fillRect(b.x - landmarkPointSize / 2, b.y - landmarkPointSize / 2, landmarkPointSize, landmarkPointSize);
             } else {
@@ -325,6 +378,7 @@ function redraw(){
 
 
         }
+
 
         /*
         // Draw spline between end points
@@ -417,10 +471,13 @@ function drawSpline(pointList, step_size, tension){
             g_context.lineTo(x, y);
             g_context.stroke();
         }
+
         prev_x = x;
         prev_y = y;
     }
 }
+
+
 
 
 function sendDataForSave() {
@@ -430,6 +487,7 @@ function sendDataForSave() {
         data: {
             control_points: JSON.stringify(g_controlPoints),
             target_frames: JSON.stringify(g_targetFrames),
+            target_frame_types: JSON.stringify(g_targetFrameTypes),
             n_labels: g_labelButtons.length,
             width: g_canvasWidth,
             height: g_canvasHeight,
