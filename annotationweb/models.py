@@ -56,7 +56,7 @@ class Task(models.Model):
         (CARDIAC_PLAX_SEGMENTATION, 'Cardiac PLAX segmentation'),
         (CARDIAC_ALAX_SEGMENTATION, 'Cardiac ALAX segmentation'),
         (SPLINE_SEGMENTATION, 'Spline segmentation'),
-        (SPLINE_LINE_POINT, 'Splines, lines & point segmentation')
+        (SPLINE_LINE_POINT, 'Splines, lines & point segmentation'),
         (IMAGE_QUALITY, 'Image Quality'),
         (CALIPER, 'Caliper')
     )
