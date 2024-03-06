@@ -16,6 +16,7 @@ import io
 import codecs
 from PIL import Image
 import base64
+from highdicom.io import ImageFileReader
 
 class SplineSegmentationExporterForm(forms.Form):
     path = forms.CharField(label='Storage path', max_length=1000)
@@ -137,6 +138,7 @@ class SplineSegmentationExporter(Exporter):
 
                 filename = image_sequence.format.replace('#', str(frame.frame_nr))
                 new_filename = join(subject_subfolder, target_name)
+
                 copy_image(filename, new_filename)
 
                 # Get control points to create segmentation
@@ -144,10 +146,17 @@ class SplineSegmentationExporter(Exporter):
                     image_mhd = MetaImage(filename=new_filename)
                     image_size = image_mhd.get_size()
                     spacing = image_mhd.get_spacing()
-                else:
+                elif new_filename.endswith('.png'):
                     image_pil = PIL.Image.open(new_filename)
                     image_size = image_pil.size
                     spacing = [1, 1]
+                else:
+                    # Assume dicom file
+                    with ImageFileReader(os.path.dirname(filename)) as image:
+                        im = image.read_frame(frame.frame_nr, correct_color=False)
+                    image_size = im.shape[0:2]
+                    spacing = [1, 1]
+
                 self.save_segmentation(frame, image_size, join(subject_subfolder, target_gt_name), spacing, json_annotations)
 
         return True, path
@@ -289,9 +298,12 @@ class SplineSegmentationExporter(Exporter):
         if image_filename.endswith('.mhd'):
             image_mhd = MetaImage(filename=image_filename)
             image_array = image_mhd.get_pixel_data()
-        else:
+        elif image_filename.endswith('.png'):
             image_pil = PIL.Image.open(image_filename)
             image_array = np.asarray(image_pil)
+        else:
+            with ImageFileReader(os.path.dirname(image_filename)) as image:
+                image_array = image.read_frame(frame.frame_nr, correct_color=False)
         if json_annotations:
             image_data = img_arr_to_b64(image_array)
             json_dict = create_json(coords, image_size, filename, image_data)
@@ -299,7 +311,6 @@ class SplineSegmentationExporter(Exporter):
                 print("The json file is created")
                 jason_str = json.dumps(json_dict)
                 f.write(jason_str)
-
         else:
             segmentation_mhd = MetaImage(data=segmentation)
             segmentation_mhd.set_attribute('ImageQuality', frame.image_annotation.image_quality)
